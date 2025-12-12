@@ -40,7 +40,7 @@ export default function SearchBar() {
   return (
     <div className="w-full">
       <div className="relative">
-        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-xl">🔍</span>
+        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-xl"></span>
         <input
           type="text"
           value={query}

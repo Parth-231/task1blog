@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -14,7 +13,11 @@ export default function ArticleClient({ id }: { id: string }) {
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
 
-  const pos = searchParams.get("pos") || "0"; 
+  // Get ALL parameters
+  const pos = searchParams.get("pos") || "0";
+  const view = searchParams.get("view");
+  const query = searchParams.get("query");
+  const tag = searchParams.get("tag");
 
   const { article: singleArticle, loading, error } = useAppSelector(
     (state) => state.articles
@@ -35,7 +38,18 @@ export default function ArticleClient({ id }: { id: string }) {
   const isCurrentlyLoading = loading || currentId !== id;
 
   const handleGoBack = () => {
-    router.push(`/?pos=${pos}`, { scroll: false });
+    const params = new URLSearchParams();
+    
+    params.set("pos", pos);
+    if (view) {
+      params.set("view", view);
+    }    
+    searchParams.forEach((value, key) => {
+      if (key !== "pos" && key !== "view") {
+        params.set(key, value);
+      }
+    }); 
+    router.push(`/?${params.toString()}`, { scroll: false });
   };
 
   if (isCurrentlyLoading) return <Loading message="Loading article..." />;
@@ -49,7 +63,7 @@ export default function ArticleClient({ id }: { id: string }) {
           onClick={handleGoBack}
           className="mb-6 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded transition-colors dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
         >
-          ← Back
+          ← Back to Articles
         </button>
       </div>
 

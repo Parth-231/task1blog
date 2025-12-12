@@ -23,8 +23,9 @@ export default function AuthorClient({ username }: { username: string }) {
   const isLoadingRef = useRef(false);
 
   const perPage = 10;
-
-  const fromPos = searchParams.get("from"); // checks and return you to the article from where you clicked
+  const pos = searchParams.get("pos") || "0";
+  const view = searchParams.get("view") || "grid";
+  const isListView = view === "list";
 
   // restore scroll
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function AuthorClient({ username }: { username: string }) {
       }, 0);
     }
   }, []);
+  
   // save scroll
   useEffect(() => {
     const saveScroll = () => {
@@ -109,15 +111,17 @@ export default function AuthorClient({ username }: { username: string }) {
   }, [page]);
 
   const handleGoBack = () => {
-    if (fromPos) {
-      const articlePos = parseInt(fromPos, 10);
-      if (!isNaN(articlePos)) {
-        router.push(`/?pos=${articlePos}`);
-        return;
+    const params = new URLSearchParams();
+    params.set("pos", pos);
+    searchParams.forEach((value, key) => {
+      if (key !== "pos") {
+        params.set(key, value);
       }
-    }
-    router.push("/");
+    });
+    router.push(`/?${params.toString()}`, { scroll: false });
   };
+
+  const containerClass = isListView ? "articles-list" : "articles-grid";
 
   if (initialLoading) {
     return (
@@ -173,9 +177,13 @@ export default function AuthorClient({ username }: { username: string }) {
         </p>
       </div>
 
-      <div className="articles-grid">
-        {articles.map((article) => (
-          <BlogCard key={article.id} article={article} />
+      <div className={containerClass}>
+        {articles.map((article, index) => (
+          <BlogCard 
+            key={article.id} 
+            article={article}
+            index={parseInt(pos)}
+          />
         ))}
       </div>
 
@@ -186,7 +194,7 @@ export default function AuthorClient({ username }: { username: string }) {
       )}
 
       {loading && (
-        <div className="space-y-4">
+        <div className={containerClass}>
           <SkeletonCard />
           <SkeletonCard />
         </div>

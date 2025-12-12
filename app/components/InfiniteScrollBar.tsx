@@ -9,7 +9,11 @@ import { Article } from "@/redux/api/articlesApi";
 import BlogCard from "./BlogCard";
 import SkeletonCard from "./SkeletonCard";
 
-export default function InfiniteScrollBar() {
+interface InfiniteScrollBarProps {
+  isListView: boolean;
+}
+
+export default function InfiniteScrollBar({ isListView }: InfiniteScrollBarProps) {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,8 +30,8 @@ export default function InfiniteScrollBar() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
   const hasRestoredScroll = useRef(false);
+  const scrollAttempts = useRef(0);
 
-  // Get position from URL query parameter
   const returnPos = searchParams.get("pos");
 
   const loadArticles = useCallback(
@@ -53,9 +57,14 @@ export default function InfiniteScrollBar() {
           ).unwrap();
         }
         if (payload.length) {
-          setItems((prev) =>
-            Array.from(new Map([...prev, ...payload].map((a) => [a.id, a])).values())
-          );
+          setItems((prev) => {
+            // If loading page 1, replace all items
+            if (pageToLoad === 1) {
+              return payload;
+            }
+            // For subsequent pages, append and deduplicate
+            return Array.from(new Map([...prev, ...payload].map((a) => [a.id, a])).values());
+          });
           setPage(pageToLoad);
           if (payload.length < perPage) setHasMore(false);
         } else {
@@ -71,77 +80,84 @@ export default function InfiniteScrollBar() {
     [dispatch, perPage, selectedTag, searchQuery]
   );
 
-  // Initial load - load enough pages to reach the target article
+  // Reset state and load page 1 when view, tag, or search changes
   useEffect(() => {
     setItems([]);
     setPage(1);
     setHasMore(true);
     hasRestoredScroll.current = false;
+    scrollAttempts.current = 0;
+    isLoadingRef.current = false;
+    
+    // Load page 1 immediately after reset
+    loadArticles(1);
+  }, [isListView, selectedTag, searchQuery, loadArticles]);
 
-    const loadInitialArticles = async () => {
-      if (returnPos) {
-        const targetIndex = parseInt(returnPos, 10);
-        const pagesNeeded = Math.ceil((targetIndex + 1) / perPage);
-        
-        // Load all necessary pages sequentially
-        for (let i = 1; i <= pagesNeeded; i++) {
-          await loadArticles(i);
-        }
-      } else {
-        await loadArticles(1);
-      }
-    };
-
-    loadInitialArticles();
-  }, [selectedTag, searchQuery, returnPos, perPage]);
-
-  // Restore scroll position when returning from article page
+  // Scroll restoration - improved version
   useEffect(() => {
     if (!returnPos || hasRestoredScroll.current) return;
 
     const targetIndex = parseInt(returnPos, 10);
     
-    // Check if enough items loaded
-    if (items.length <= targetIndex) {
-      return; // Wait for more items to load
+    // Check if we need to load more pages to reach the target
+    if (items.length <= targetIndex && hasMore && !isLoading) {
+      const pagesNeeded = Math.ceil((targetIndex + 1) / perPage);
+      if (page < pagesNeeded) {
+        loadArticles(page + 1);
+        return;
+      }
     }
 
-    const targetElement = document.querySelector(
-      `[data-article-index="${targetIndex}"]`
-    );
+    // If we have enough items or can't load more, try to scroll
+    if (items.length > targetIndex || (!hasMore && items.length > 0)) {
+      const actualIndex = Math.min(targetIndex, items.length - 1);
+      const targetElement = document.querySelector(
+        `[data-article-index="${actualIndex}"]`
+      );
 
-    if (targetElement) {
-      hasRestoredScroll.current = true;
-      
-      // Use requestAnimationFrame 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          targetElement.scrollIntoView({ 
-            block: "center", 
-            behavior: "instant"
+      if (targetElement && scrollAttempts.current < 10) {
+        scrollAttempts.current++;
+        
+        // Wait for render to complete
+        setTimeout(() => {
+          targetElement.scrollIntoView({
+            block: "center",
+            behavior: "instant",
           });
+          hasRestoredScroll.current = true;
+          // Clean up URL after successful scroll
           setTimeout(() => {
             const newUrl = new URL(window.location.href);
             newUrl.searchParams.delete("pos");
-            try {
-              window.history.replaceState({ ...history.state }, "", newUrl.pathname + newUrl.search); // replace the current history instead of adding new one
-            } catch (e) {
-              // router.replace if history API is unavailable
-              router.replace(newUrl.pathname + newUrl.search, { scroll: false });
-            }
-          }, 500);
-        });
-      });
+            window.history.replaceState(
+              { ...window.history.state }, 
+              "", 
+              newUrl.pathname + newUrl.search
+            );
+          }, 800);
+        }, 100);
+      } else if (!targetElement && scrollAttempts.current < 10) {
+        // Retry if element not found yet
+        scrollAttempts.current++;
+        setTimeout(() => {
+          // Trigger re-check
+          const check = targetElement;
+        }, 100);
+      }
     }
-  }, [items, returnPos, router]);
+  }, [items, returnPos, router, hasMore, isLoading, page, perPage, loadArticles]);
 
   // Infinite scroll observer
   useEffect(() => {
-    if (!sentinelRef.current || isLoading) return;
+    if (!sentinelRef.current || isLoading || !hasMore) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && hasMore && !isLoadingRef.current) {
+          // Prevent loading page 2 when we just switched views
+          if (items.length === 0) {
+            return;
+          }
           loadArticles(page + 1);
         }
       },
@@ -150,11 +166,13 @@ export default function InfiniteScrollBar() {
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [page, hasMore, loadArticles, isLoading]);
+  }, [page, hasMore, loadArticles, isLoading, items.length]);
+
+  const containerClass = isListView ? "articles-list" : "articles-grid";
 
   return (
     <div>
-      <div className="articles-grid">
+      <div className={containerClass}>
         {items.map((article, index) => (
           <div
             key={article.id}
@@ -167,17 +185,25 @@ export default function InfiniteScrollBar() {
       </div>
 
       {isLoading && (
-        <div className="articles-grid mt-8">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
+        <div className={`${containerClass} mt-8`}>
+          {[...Array(5)].map((_, i) => (
+            <SkeletonCard key={`skeleton-${i}`} />
+          ))}
         </div>
       )}
 
-      <div ref={sentinelRef} className="h-10" />
+      <div ref={sentinelRef} className="h-20" />
 
       {!hasMore && items.length > 0 && !isLoading && (
-        <p className="text-center text-gray-500 py-12">No more articles</p>
+        <p className="text-center text-gray-500 py-12">
+          {searchQuery
+            ? "No more results for your search."
+            : "You've reached the end. No more articles."}
+        </p>
+      )}
+
+      {!isLoading && items.length === 0 && !hasMore && (
+        <p className="text-center text-gray-500 py-20">No articles found.</p>
       )}
     </div>
   );

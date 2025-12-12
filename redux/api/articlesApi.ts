@@ -6,6 +6,8 @@ export interface Article {
   tags: string[];
   cover_image?: string | undefined;
   published_at: string;
+  readable_publish_date: string;
+  created_at: string;
   user: {
     name: string;
     username: string;

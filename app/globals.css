@@ -10,11 +10,21 @@
   }
 }
 
-/* Grid layout styles */
 .articles-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
+  width: 100%;
+}
+
+.articles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+/* Ensure cards are full width in list view */
+.articles-list > div {
   width: 100%;
 }
 
