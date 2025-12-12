@@ -9,9 +9,7 @@ import { Article } from "@/redux/api/articlesApi";
 import BlogCard from "./BlogCard";
 import SkeletonCard from "./SkeletonCard";
 
-interface InfiniteScrollBarProps {
-  isListView: boolean;
-}
+interface InfiniteScrollBarProps { isListView: boolean;}
 
 export default function InfiniteScrollBar({ isListView }: InfiniteScrollBarProps) {
   const dispatch = useAppDispatch();
@@ -58,11 +56,9 @@ export default function InfiniteScrollBar({ isListView }: InfiniteScrollBarProps
         }
         if (payload.length) {
           setItems((prev) => {
-            // If loading page 1, replace all items
             if (pageToLoad === 1) {
               return payload;
             }
-            // For subsequent pages, append and deduplicate
             return Array.from(new Map([...prev, ...payload].map((a) => [a.id, a])).values());
           });
           setPage(pageToLoad);
@@ -80,7 +76,6 @@ export default function InfiniteScrollBar({ isListView }: InfiniteScrollBarProps
     [dispatch, perPage, selectedTag, searchQuery]
   );
 
-  // Reset state and load page 1 when view, tag, or search changes
   useEffect(() => {
     setItems([]);
     setPage(1);
@@ -89,17 +84,14 @@ export default function InfiniteScrollBar({ isListView }: InfiniteScrollBarProps
     scrollAttempts.current = 0;
     isLoadingRef.current = false;
     
-    // Load page 1 immediately after reset
     loadArticles(1);
   }, [isListView, selectedTag, searchQuery, loadArticles]);
 
-  // Scroll restoration - improved version
   useEffect(() => {
     if (!returnPos || hasRestoredScroll.current) return;
 
     const targetIndex = parseInt(returnPos, 10);
     
-    // Check if we need to load more pages to reach the target
     if (items.length <= targetIndex && hasMore && !isLoading) {
       const pagesNeeded = Math.ceil((targetIndex + 1) / perPage);
       if (page < pagesNeeded) {
@@ -108,7 +100,6 @@ export default function InfiniteScrollBar({ isListView }: InfiniteScrollBarProps
       }
     }
 
-    // If we have enough items or can't load more, try to scroll
     if (items.length > targetIndex || (!hasMore && items.length > 0)) {
       const actualIndex = Math.min(targetIndex, items.length - 1);
       const targetElement = document.querySelector(
@@ -117,15 +108,12 @@ export default function InfiniteScrollBar({ isListView }: InfiniteScrollBarProps
 
       if (targetElement && scrollAttempts.current < 10) {
         scrollAttempts.current++;
-        
-        // Wait for render to complete
         setTimeout(() => {
           targetElement.scrollIntoView({
             block: "center",
             behavior: "instant",
           });
           hasRestoredScroll.current = true;
-          // Clean up URL after successful scroll
           setTimeout(() => {
             const newUrl = new URL(window.location.href);
             newUrl.searchParams.delete("pos");
@@ -137,24 +125,20 @@ export default function InfiniteScrollBar({ isListView }: InfiniteScrollBarProps
           }, 800);
         }, 100);
       } else if (!targetElement && scrollAttempts.current < 10) {
-        // Retry if element not found yet
         scrollAttempts.current++;
         setTimeout(() => {
-          // Trigger re-check
           const check = targetElement;
         }, 100);
       }
     }
   }, [items, returnPos, router, hasMore, isLoading, page, perPage, loadArticles]);
 
-  // Infinite scroll observer
   useEffect(() => {
     if (!sentinelRef.current || isLoading || !hasMore) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && hasMore && !isLoadingRef.current) {
-          // Prevent loading page 2 when we just switched views
           if (items.length === 0) {
             return;
           }

@@ -25,20 +25,14 @@ export default function BlogCard({
 
   const formattedDate = new Date(article.created_at).toLocaleDateString("en-GB");
 
-  // Preserve ALL query parameters
   const buildQueryParams = () => {
     const params = new URLSearchParams();
-
-    // Copy ALL existing query parameters
     searchParams.forEach((value, key) => {
       params.set(key, value);
     });
-
-    // Add or update position parameter
     if (index !== undefined) {
       params.set("pos", index.toString());
     }
-
     return params.toString();
   };
 
